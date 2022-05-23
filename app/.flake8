@@ -7,4 +7,6 @@ exclude =
     models.py,
     admin.py,
     views.py,
-    throwaay_tests.py
+    throwaay_tests.py,
+    test_admin.py,
+    test_commands.py
