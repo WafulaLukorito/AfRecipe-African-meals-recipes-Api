@@ -8,9 +8,12 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/app
+      - ./wait-for-it.sh:/wait-for-it.sh
 
     command: >
-      sh -c " python manage.py wait_for_db &&
+      sh -c " 
+      /wait-for-it.sh db:5432 configs:
+      python manage.py wait_for_db &&
               python manage.py migrate &&
               python manage.py runserver 0.0.0.0:8000"
     environment:
