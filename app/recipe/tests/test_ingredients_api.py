@@ -29,6 +29,6 @@ class PublicIngredientsApiTests(TestCase):
 class PrivateIngredientsApiTests(TestCase):
     """Test ingredients can be retrieved by authorized user"""
 
-    def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            '
+    # def setUp(self):
+    #     self.user = get_user_model().objects.create_user(
+    #         '
