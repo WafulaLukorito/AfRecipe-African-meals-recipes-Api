@@ -1,106 +1,84 @@
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework import viewsets, mixins, status
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from django.test import TestCase
 
-from core.models import Tag, Ingredient, Recipe
+from rest_framework import status
+from rest_framework.test import APIClient
 
-from recipe import serializers
+from core.models import Ingredient
+
+from recipe.serializers import IngredientSerializer
 
 
-class BaseRecipeAttrViewSet(viewsets.GenericViewSet,
-                            mixins.ListModelMixin,
-                            mixins.CreateModelMixin):
-    """Base viewset for user owned recipe attributes"""
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
+INGREDIENTS_URL = reverse('recipe:ingredient-list')
 
-    def get_queryset(self):
-        """Return objects for the current authenticated user only"""
-        assigned_only = bool(
-            int(self.request.query_params.get('assigned_only', 0))
+
+class PublicIngredientsApiTests(TestCase):
+    """Test the publicly available ingredients API"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_login_required(self):
+        """Test that login is required to access endpoints"""
+        res = self.client.get(INGREDIENTS_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PrivateIngredientsApiTests(TestCase):
+    """Test the private ingredients API"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            'hello@lukorito.dev',
+            'testpass'
         )
-        queryset = self.queryset
-        if assigned_only:
-            queryset = queryset.filter(recipe__isnull=False)
+        self.client.force_authenticate(self.user)
 
-        return queryset.filter(
-            user=self.request.user
-        ).order_by('-name').distinct()
+    def test_retrieve_ingredient_list(self):
+        """Test retrieving a list of ingredients"""
+        Ingredient.objects.create(user=self.user, name='Kale')
+        Ingredient.objects.create(user=self.user, name='Salt')
 
-    def perform_create(self, serializer):
-        """Create a new object"""
-        serializer.save(user=self.request.user)
+        res = self.client.get(INGREDIENTS_URL)
 
+        ingredients = Ingredient.objects.all().order_by('-name')
+        serializer = IngredientSerializer(ingredients, many=True)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data, serializer.data)
 
-class TagViewSet(BaseRecipeAttrViewSet):
-    """Manage tags in the database"""
-    queryset = Tag.objects.all()
-    serializer_class = serializers.TagSerializer
-
-
-class IngredientViewSet(BaseRecipeAttrViewSet):
-    """Manage ingredients in the database"""
-    queryset = Ingredient.objects.all()
-    serializer_class = serializers.IngredientSerializer
-
-
-class RecipeViewSet(viewsets.ModelViewSet):
-    """Manage recipes in the database"""
-    serializer_class = serializers.RecipeSerializer
-    queryset = Recipe.objects.all()
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
-
-    def _params_to_ints(self, qs):
-        """Convert a list of string IDs to a list of integers"""
-        return [int(str_id) for str_id in qs.split(',')]
-
-    def get_queryset(self):
-        """Retrieve the recipes for the authenticated user"""
-        tags = self.request.query_params.get('tags')
-        ingredients = self.request.query_params.get('ingredients')
-        queryset = self.queryset
-        if tags:
-            tag_ids = self._params_to_ints(tags)
-            queryset = queryset.filter(tags__id__in=tag_ids)
-        if ingredients:
-            ingredient_ids = self._params_to_ints(ingredients)
-            queryset = queryset.filter(ingredients__id__in=ingredient_ids)
-
-        return queryset.filter(user=self.request.user)
-
-    def get_serializer_class(self):
-        """Return appropriate serializer class"""
-        if self.action == 'retrieve':
-            return serializers.RecipeDetailSerializer
-        elif self.action == 'upload_image':
-            return serializers.RecipeImageSerializer
-
-        return self.serializer_class
-
-    def perform_create(self, serializer):
-        """Create a new recipe"""
-        serializer.save(user=self.request.user)
-
-    @action(methods=['POST'], detail=True, url_path='upload-image')
-    def upload_image(self, request, pk=None):
-        """Upload an image to a recipe"""
-        recipe = self.get_object()
-        serializer = self.get_serializer(
-            recipe,
-            data=request.data
+    def test_ingredients_limited_to_user(self):
+        """Test that ingredients for the authenticated user are returned"""
+        user2 = get_user_model().objects.create_user(
+            'helhlo@lukorito.dev',
+            'testpass'
         )
+        Ingredient.objects.create(user=user2, name='Vinegar') # should not be returned #not for user
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(
-                serializer.data,
-                status=status.HTTP_200_OK
-            )
+        ingredient = Ingredient.objects.create(user=self.user, name='Tumeric') # should be returned
 
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        res = self.client.get(INGREDIENTS_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]['name'], ingredient.name)
+
+    def test_create_ingredient_successful(self):
+        """Test create a new ingredient"""
+        payload = {'name': 'Cabbage'}
+        self.client.post(INGREDIENTS_URL, payload)
+
+        exists = Ingredient.objects.filter(
+            user=self.user,
+            name=payload['name'],
+        ).exists()
+        self.assertTrue(exists)
+
+    def test_create_ingredient_invalid(self):
+        """Test creating invalid ingredient fails"""
+        payload = {'name': ''}
+        res = self.client.post(INGREDIENTS_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
