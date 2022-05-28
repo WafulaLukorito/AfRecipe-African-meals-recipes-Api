@@ -55,9 +55,9 @@ class PrivateIngredientsApiTests(TestCase):
             'helhlo@lukorito.dev',
             'testpass'
         )
-        Ingredient.objects.create(user=user2, name='Vinegar') # should not be returned #not for user
+        Ingredient.objects.create(user=user2, name='Vinegar')
 
-        ingredient = Ingredient.objects.create(user=self.user, name='Tumeric') # should be returned
+        ingredient = Ingredient.objects.create(user=self.user, name='Tumeric')
 
         res = self.client.get(INGREDIENTS_URL)
 
