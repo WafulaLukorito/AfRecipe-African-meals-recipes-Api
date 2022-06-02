@@ -47,11 +47,15 @@ class IngredientViewSet(BaseRecipeAttrViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    """Manages recipes in the database"""
+    """Manage recipes in the database"""
     serializer_class = serializers.RecipeSerializer
     queryset = Recipe.objects.all()
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+
+    def _params_to_ints(self, qs):
+        """Convert a list of string IDs to a list of integers"""
+        return [int(str_id) for str_id in qs.split(',')]
 
     def get_queryset(self):
         """Retrieve the recipes for the authenticated user"""
@@ -71,6 +75,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         """Return appropriate serializer class"""
         if self.action == 'retrieve':
             return serializers.RecipeDetailSerializer
+        elif self.action == 'upload_image':
+            return serializers.RecipeImageSerializer
 
         return self.serializer_class
 
