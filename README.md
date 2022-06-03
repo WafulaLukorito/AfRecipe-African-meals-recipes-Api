@@ -1,6 +1,4 @@
 # AfRecipe African Meals Recipes Api
-Source code for African Meals API.
-
 This is a fully-functioning REST API built with Python Django utilizing the Django Rest Framework. The API is designed to be used by AfRecipe clients.
 
 The API employs test-driven develpment with many unit tests written for every feature, with Travis-CI and Jenkins used as CI/CD tools.
