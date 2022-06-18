@@ -9,7 +9,7 @@ A Postrges (Postgresql) database has been employed.
 
 Though the API has been built primarily for the AfRecipe Project, An MIT License is provided so you may use the API and back-end freely in creating your own front-ends for recipe websites.
 
-### The API has created has the following end-points that support CRUD operations:
+### The API created has the following end-points that support CRUD operations:
 
 - User Manangement
 - Tags
